@@ -46,8 +46,8 @@ func TestFileBlockDevice(t *testing.T) {
 		t.Error("Resize failed")
 	}
 
-	zero := make([]byte, BLOCK_SIZE)
-	for i := 0; i < BLOCK_SIZE; i++ {
+	zero := make([]byte, BlockSize)
+	for i := 0; i < BlockSize; i++ {
 		zero[i] = 0
 	}
 

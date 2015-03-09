@@ -3,7 +3,9 @@ package everdb
 import "errors"
 import "os"
 
-const BLOCK_SIZE = 4096
+const (
+	BlockSize = 4096
+)
 
 type FileBlockDevice struct {
 	file *os.File
@@ -16,16 +18,19 @@ func NewFileBlockDevice(fname string, readonly bool, overwrite bool) (*FileBlock
 	}
 
 	f := new(FileBlockDevice)
-	var err error
 
-	if readonly {
-		f.file, err = os.OpenFile(fname, os.O_RDONLY, 0)
-	} else if overwrite {
-		f.file, err = os.OpenFile(fname, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0666)
-	} else {
-		f.file, err = os.OpenFile(fname, os.O_CREATE|os.O_RDWR, 0666)
+	flags := 0
+	switch {
+	case readonly:
+		flags = os.O_RDONLY
+	case overwrite:
+		flags = os.O_CREATE | os.O_RDWR | os.O_TRUNC
+	default:
+		flags = os.O_CREATE | os.O_RDWR
 	}
 
+	var err error
+	f.file, err = os.OpenFile(fname, flags, 0666)
 	if nil != err {
 		return nil, err
 	}
@@ -33,13 +38,11 @@ func NewFileBlockDevice(fname string, readonly bool, overwrite bool) (*FileBlock
 	fi, err := f.file.Stat()
 	if nil != err {
 		return nil, errors.New("Failed to stat file")
+	} else if fi.Size()%BlockSize != 0 {
+		return nil, errors.New("File is corrupt (not a multiple of BlockSize")
 	}
 
-	if fi.Size()%BLOCK_SIZE != 0 {
-		return nil, errors.New("File is corrupt (not a multiple of BLOCK_SIZE")
-	}
-
-	f.len = (uint32)(fi.Size() / BLOCK_SIZE)
+	f.len = (uint32)(fi.Size() / BlockSize)
 
 	return f, nil
 }
@@ -49,7 +52,7 @@ func (f *FileBlockDevice) Len() uint32 {
 }
 
 func (f *FileBlockDevice) Resize(len uint32) error {
-	sz := (int64)(len) * BLOCK_SIZE
+	sz := (int64)(len) * BlockSize
 
 	err := f.file.Truncate(sz)
 	if nil != err {
@@ -59,9 +62,8 @@ func (f *FileBlockDevice) Resize(len uint32) error {
 	fi, err := f.file.Stat()
 	if nil != err {
 		return errors.New("Failed to stat file")
-	}
-	if fi.Size() != sz {
-		return errors.New("Failed to reize file")
+	} else if fi.Size() != sz {
+		return errors.New("Failed to resize file")
 	}
 	f.len = len
 
@@ -69,13 +71,14 @@ func (f *FileBlockDevice) Resize(len uint32) error {
 }
 
 func (f *FileBlockDevice) Get(block int) ([]byte, error) {
-	b := make([]byte, BLOCK_SIZE)
-	n, err := f.file.ReadAt(b, (int64)(block)*BLOCK_SIZE)
+	b := make([]byte, BlockSize)
+
+	n, err := f.file.ReadAt(b, (int64)(block)*BlockSize)
 	if nil != err {
 		return nil, err
+	} else if n != BlockSize {
+		return nil, errors.New("Failed to read BlockSize bytes")
 	}
-	if n != BLOCK_SIZE {
-		return nil, errors.New("Failed to read BLOCK_SIZE bytes")
-	}
+
 	return b, nil
 }
