@@ -1,8 +1,8 @@
 package everdb
 
-type Helloer struct {
+type Database struct {
 }
 
-func (h Helloer) HelloWorld() int {
+func (h Database) HelloWorld() int {
 	return 5
 }
